@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "GDSN",
+    "slug": "gdsn",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.nandson.gdsn"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0f1115",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.nandson.gdsn"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "react-native-quick-crypto",
+      "expo-sharing",
+      "expo-font"
+    ],
+    "backgroundColor": "#0f1115"
+  }
+}
