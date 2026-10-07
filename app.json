@@ -1,24 +1,27 @@
 {
   "expo": {
-    "name": "GDSN",
+    "name": "NCofres",
     "slug": "gdsn",
-    "version": "1.0.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.nandson.gdsn"
+      "bundleIdentifier": "com.ncofres.app"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#0f1115",
+        "backgroundColor": "#000000",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.nandson.gdsn"
+      "package": "com.ncofres.app",
+      "runtimeVersion": {
+        "policy": "appVersion"
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -26,8 +29,22 @@
     "plugins": [
       "react-native-quick-crypto",
       "expo-sharing",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": "Use o Face ID para desbloquear o cofre NCofres."
+        }
+      ]
     ],
-    "backgroundColor": "#0f1115"
+    "backgroundColor": "#000000",
+    "extra": {
+      "eas": {
+        "projectId": "40c9ee49-cc06-4ca7-9ec2-f02a8f3734d5"
+      }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/40c9ee49-cc06-4ca7-9ec2-f02a8f3734d5"
+    }
   }
 }

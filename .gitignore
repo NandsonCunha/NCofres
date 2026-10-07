@@ -39,3 +39,15 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Python (app desktop)
+__pycache__/
+*.pyc
+
+# cofres e backups: nunca vão para o repositório, nem os de teste
+*.ncf
+*.gdsn
+*.bak
+
+# atalho gerado por desktop/install-linux.sh (tem o caminho da máquina)
+desktop/ncofres.desktop

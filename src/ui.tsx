@@ -1,18 +1,23 @@
 import { Ionicons } from '@expo/vector-icons';
-import type { ComponentProps, ReactNode } from 'react';
+import type { ComponentProps, ReactNode, Ref } from 'react';
 import { Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { TextInputProps } from 'react-native';
 
+import { passwordStrength } from './strength';
+
+// Preto e branco, minimalista. Verde só para ação principal e confirmações.
 export const colors = {
-  bg: '#0f1115',
-  card: '#181b22',
-  border: '#2a2f3a',
-  text: '#e8eaf0',
-  muted: '#8b93a7',
-  accent: '#4f8cff',
-  danger: '#ff5c6c',
-  ok: '#3ecf8e',
+  bg: '#000',
+  card: '#000',
+  border: '#333',
+  text: '#fff',
+  muted: '#888',
+  secondary: '#bbb', // textos secundários claros, como os detalhes de uma conta
+  accent: '#22c55e',
+  danger: '#fff',
 };
+
+export const RADIUS = 2;
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -30,12 +35,13 @@ export function IconButton({ name, onPress, color = colors.muted, label }: {
 export function Button({ title, onPress, kind = 'primary', disabled }: {
   title: string; onPress: () => void; kind?: 'primary' | 'secondary' | 'danger'; disabled?: boolean;
 }) {
-  const bg = kind === 'primary' ? colors.accent : kind === 'danger' ? colors.danger : 'transparent';
+  // Primário: fundo verde, texto preto. Secundário: contorno branco, texto branco.
+  const filled = kind !== 'secondary';
   return (
     <Pressable onPress={onPress} disabled={disabled}
-      style={({ pressed }) => [styles.btn, { backgroundColor: bg, opacity: disabled ? 0.4 : pressed ? 0.7 : 1 },
-        kind === 'secondary' && styles.btnSecondary]}>
-      <Text style={[styles.btnText, kind === 'secondary' && { color: colors.accent }]}>{title}</Text>
+      style={({ pressed }) => [styles.btn, filled ? styles.btnFilled : styles.btnSecondary,
+        { opacity: disabled ? 0.3 : pressed ? 0.6 : 1 }]}>
+      <Text style={[styles.btnText, { color: filled ? colors.bg : colors.text }]}>{title}</Text>
     </Pressable>
   );
 }
@@ -44,7 +50,7 @@ export function Button({ title, onPress, kind = 'primary', disabled }: {
  * Campo para dados sensíveis: sem autocorreção, sem sugestões e sem
  * aprendizado do teclado (no Android, 'visible-password' desliga o dicionário do Gboard).
  */
-export function SecureInput(props: TextInputProps & { reveal?: boolean }) {
+export function SecureInput(props: TextInputProps & { reveal?: boolean; ref?: Ref<TextInput> }) {
   const { reveal, style, ...rest } = props;
   return (
     <TextInput
@@ -78,19 +84,39 @@ export function Sheet({ visible, title, onClose, children }: {
   );
 }
 
+/** Barra de 4 segmentos com a força da senha: vermelho, laranja, amarelo, verde. */
+export function StrengthBar({ password }: { password: string }) {
+  const { level, label, color } = passwordStrength(password);
+  return (
+    <View style={styles.strength} accessibilityLabel={`Força da senha: ${label}`}>
+      <View style={styles.strengthTrack}>
+        {[0, 1, 2, 3].map((i) => (
+          <View key={i} style={[styles.strengthSeg, { backgroundColor: i <= level ? color : colors.border }]} />
+        ))}
+      </View>
+      <Text style={[styles.strengthLabel, { color }]}>{label}</Text>
+    </View>
+  );
+}
+
 export const styles = StyleSheet.create({
+  strength: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
+  strengthTrack: { flex: 1, flexDirection: 'row', gap: 3, maxWidth: 160 },
+  strengthSeg: { flex: 1, height: 3, borderRadius: 1 },
+  strengthLabel: { fontSize: 11, letterSpacing: 0.3 },
   iconBtn: { padding: 6 },
-  btn: { paddingVertical: 12, paddingHorizontal: 16, borderRadius: 10, alignItems: 'center' },
-  btnSecondary: { borderWidth: 1, borderColor: colors.accent },
-  btnText: { color: '#fff', fontWeight: '600', fontSize: 15 },
+  btn: { paddingVertical: 12, paddingHorizontal: 16, borderRadius: RADIUS, alignItems: 'center', borderWidth: 1 },
+  btnFilled: { backgroundColor: colors.accent, borderColor: colors.accent },
+  btnSecondary: { backgroundColor: 'transparent', borderColor: colors.text },
+  btnText: { fontWeight: '600', fontSize: 14, letterSpacing: 0.5 },
   input: {
     backgroundColor: colors.card, color: colors.text, borderWidth: 1, borderColor: colors.border,
-    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15,
+    borderRadius: RADIUS, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15,
   },
-  backdrop: { flex: 1, backgroundColor: '#000a', justifyContent: 'center', padding: 20 },
-  sheet: { backgroundColor: colors.bg, borderRadius: 14, padding: 18, gap: 12, borderWidth: 1, borderColor: colors.border },
-  sheetTitle: { color: colors.text, fontSize: 18, fontWeight: '700' },
+  backdrop: { flex: 1, backgroundColor: '#000c', justifyContent: 'center', padding: 20 },
+  sheet: { backgroundColor: colors.bg, borderRadius: RADIUS, padding: 18, gap: 12, borderWidth: 1, borderColor: colors.text },
+  sheetTitle: { color: colors.text, fontSize: 17, fontWeight: '600' },
   label: { color: colors.muted, fontSize: 13 },
-  error: { color: colors.danger, textAlign: 'center' },
+  error: { color: colors.text, textAlign: 'center', textDecorationLine: 'underline' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 });

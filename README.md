@@ -1,37 +1,55 @@
-# GDSN
+# NCofres
 
 Gerenciador de senhas para celular (Expo / React Native), simples e seguro.
-Tudo fica num único arquivo `cofre.gdsn` cifrado, na área privada do app.
+Tudo fica num único arquivo `cofre.ncf` cifrado, na área privada do app.
 
 - `App.tsx`, `src/`: app de celular
-- `desktop/`: versão desktop em Python/PySide6, com o **mesmo formato de arquivo** (um `.gdsn` exportado do celular abre no PC e vice-versa)
+- `desktop/`: versão desktop em Python/PySide6, com o **mesmo formato de arquivo** (um `.ncf` exportado do celular abre no PC e vice-versa)
 
 ## Uso
 
-- Digite `google: email@gmail.com: senha123` e toque em **Confirmar**. A senha pode conter `:`.
-- **🎲 Gerar senha** completa o campo com uma senha forte de 20 caracteres.
-- 👁 revela a senha e mostra **copiar** e **ocultar**. Ela volta a ser ocultada sozinha após 20 s.
+- Três campos: **Serviço**, **Usuário ou e-mail** e **Senha**. Toque em **Confirmar** para salvar.
+- O campo **Serviço** também serve de busca: a lista filtra enquanto você digita.
+- **Gerar senha** preenche a senha com uma senha forte de 20 caracteres e a mostra.
+- O olho revela a senha e mostra **copiar** e **ocultar**, com uma barra colorida indicando a força. Ela volta a ser ocultada sozinha após 20 s.
 - Senhas copiadas são apagadas da área de transferência após 30 s.
-- Ícones do topo: **importar** (mescla outro `.gdsn`), **exportar** (menu de compartilhar), **travar**.
+- Engrenagem: **exportar** (menu de compartilhar), **importar** (mescla outro `.ncf`), **trocar senha mestra**, **digital** e **sobre**. Ao lado, o cadeado **trava**.
+- Cofres antigos (`.gdsn`, do tempo em que o app se chamava GDSN) continuam abrindo e são convertidos para `.ncf`.
 
-## Rodar (development build)
+## Instalar no celular (uso diário)
+
+Gera um APK completo que roda **100% no celular**, sem PC e sem servidor:
+
+```bash
+npx eas-cli@latest build --profile preview --platform android
+```
+
+Abra o link do final do build no celular e instale o APK.
+
+### Atualizações (sem reinstalar)
+
+Mudanças de código (telas, lógica) chegam pelo EAS Update, como no app Meus Gastos:
+
+```bash
+npx eas-cli@latest update --channel preview --message "o que mudou"
+```
+
+O app baixa a atualização ao abrir e aplica **na próxima vez que for aberto**.
+Só é preciso gerar um APK novo quando entrar uma biblioteca nativa nova ou mudar a `version` do `app.json`.
+Nos dois casos os dados continuam: o cofre fica no armazenamento do app e a Keystore do EAS é sempre a mesma.
+
+Como quem controla a conta Expo pode enviar código ao app, proteja a conta com senha forte e 2FA.
 
 O app usa criptografia nativa (`react-native-quick-crypto`), então **não roda no Expo Go**.
 
-**Opção A: build na nuvem (EAS), sem Android Studio**
-```bash
-npx eas-cli@latest login
-npx eas-cli@latest build --profile development --platform android
-# instale o APK gerado no celular (link/QR code no final do build)
-npm start          # servidor de desenvolvimento; abra o app GDSN instalado
-```
+## Desenvolver (opcional)
 
-**Opção B: build local**: precisa de JDK 17 + Android SDK instalados.
-```bash
-npm run android
-```
+Para ver mudanças no código na hora, sem gerar APK a cada alteração:
 
-Só é preciso refazer o build quando mudar dependências nativas. Mudanças no código JS aparecem direto via `npm start`.
+```bash
+npx eas-cli@latest build --profile development --platform android   # uma vez
+npm start                                                             # PC e celular na mesma rede
+```
 
 ## Verificações
 
@@ -49,7 +67,8 @@ npx expo lint
 | Criptografia | AES-256-GCM (sigilo + integridade), nonce novo a cada gravação |
 | Cabeçalho | Usado como AAD: adulterar parâmetros ou salt faz a abertura falhar |
 | Senha mestra | Nunca é gravada; a chave derivada fica só na memória enquanto o cofre está aberto |
-| Gravação | Temporário + substituição; versão anterior em `cofre.gdsn.bak` |
+| Digital (opcional) | A chave do cofre fica no Android Keystore, liberada só após biometria forte; invalidada se as digitais do celular mudarem; senha mestra pedida a cada 7 dias |
+| Gravação | Temporário + substituição; versão anterior em `cofre.ncf.bak` |
 | Print de tela | Bloqueado no Android (`FLAG_SECURE`). No iOS não dá para bloquear; a tela é borrada no seletor de apps |
 | Teclado | Campos sem autocorreção/sugestões; no Android o teclado não aprende o que é digitado |
 | Área de transferência | Limpa após 30 s (se o app for encerrado antes, não limpa) |

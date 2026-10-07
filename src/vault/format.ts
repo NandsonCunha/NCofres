@@ -1,6 +1,8 @@
 /**
- * Formato do cofre GDSN — idêntico ao do app desktop (desktop/gdsn/vault.py),
- * então um .gdsn exportado do celular abre no PC e vice-versa.
+ * Formato do cofre NCofres — idêntico ao do app desktop (desktop/ncofres/vault.py),
+ * então um .ncf exportado do celular abre no PC e vice-versa.
+ * Cofres antigos (formato "GDSN", extensão .gdsn) continuam abrindo e são
+ * regravados no formato novo na próxima vez que forem salvos.
  *
  * Arquivo = JSON com cabeçalho em claro (parâmetros do KDF, salt, nonce) e o
  * conteúdo cifrado com AES-256-GCM. A chave vem da senha mestra via Argon2id.
@@ -10,7 +12,8 @@
  * `CryptoProvider`, o que permite testá-lo no Node.
  */
 
-export const FORMAT = 'GDSN';
+export const FORMAT = 'NCOFRES';
+const LEGACY_FORMATS = ['GDSN'];
 export const VERSION = 1;
 
 export type KdfParams = {
@@ -46,6 +49,7 @@ export type Entry = {
   service: string;
   username: string;
   password: string;
+  details: string; // descrição opcional (cofres antigos não têm: vira '')
   id: string;
   created: number; // segundos (compatível com o time.time() do Python)
   updated: number;
@@ -60,9 +64,11 @@ export type VaultSession = {
 
 // ------------------------------------------------------------------ entradas
 
-export function newEntry(c: CryptoProvider, service: string, username: string, password: string): Entry {
+export function newEntry(
+  c: CryptoProvider, service: string, username: string, password: string, details = '',
+): Entry {
   const now = Date.now() / 1000;
-  return { service, username, password, id: toHex(c.randomBytes(16)), created: now, updated: now };
+  return { service, username, password, details, id: toHex(c.randomBytes(16)), created: now, updated: now };
 }
 
 /**
@@ -109,36 +115,63 @@ export async function createVault(c: CryptoProvider, masterPassword: string): Pr
   return { key: await deriveKey(c, masterPassword, salt, kdf), salt, kdf, entries: [] };
 }
 
+/**
+ * Troca a senha mestra: confere a atual e devolve uma sessão com salt e chave novos.
+ * Quem chama grava com sealVault, o que cifra o cofre inteiro de novo com a chave nova.
+ */
+export async function changeMasterPassword(
+  c: CryptoProvider, session: VaultSession, currentPassword: string, newPassword: string,
+): Promise<VaultSession> {
+  const current = await deriveKey(c, currentPassword, session.salt, session.kdf);
+  if (!sameKey(current, session.key)) throw new WrongPasswordError('Senha atual incorreta');
+  const salt = c.randomBytes(16);
+  const kdf = { ...DEFAULT_KDF };
+  return { ...session, salt, kdf, key: await deriveKey(c, newPassword, salt, kdf) };
+}
+
 export async function openVault(c: CryptoProvider, fileText: string, masterPassword: string): Promise<VaultSession> {
-  let kdf: KdfParams, salt: Uint8Array, nonce: Uint8Array, ciphertext: Uint8Array;
+  const file = parseVaultFile(fileText);
+  return decryptVault(c, file, await deriveKey(c, masterPassword, file.salt, file.kdf));
+}
+
+/**
+ * Abre com uma chave já derivada (a que o Keystore libera após a digital),
+ * sem passar pelo Argon2id. Chave errada dá o mesmo erro que senha errada.
+ */
+export function openVaultWithKey(c: CryptoProvider, fileText: string, key: Uint8Array): VaultSession {
+  return decryptVault(c, parseVaultFile(fileText), key);
+}
+
+type VaultFile = { format: string; kdf: KdfParams; salt: Uint8Array; nonce: Uint8Array; ciphertext: Uint8Array };
+
+function parseVaultFile(fileText: string): VaultFile {
   try {
     const doc = JSON.parse(fileText);
-    if (doc.format !== FORMAT) throw new VaultError('Não é um arquivo GDSN');
+    if (doc.format !== FORMAT && !LEGACY_FORMATS.includes(doc.format)) throw new VaultError('Não é um cofre NCofres');
     if (doc.version !== VERSION) throw new VaultError(`Versão de cofre não suportada: ${doc.version}`);
-    kdf = doc.kdf;
-    salt = fromBase64(doc.salt);
-    nonce = fromBase64(doc.nonce);
-    ciphertext = fromBase64(doc.ciphertext);
+    return { format: doc.format, kdf: doc.kdf, salt: fromBase64(doc.salt), nonce: fromBase64(doc.nonce), ciphertext: fromBase64(doc.ciphertext) };
   } catch (e) {
     if (e instanceof VaultError) throw e;
     throw new VaultError(`Arquivo corrompido: ${(e as Error).message}`);
   }
+}
 
-  const key = await deriveKey(c, masterPassword, salt, kdf);
+function decryptVault(c: CryptoProvider, { format, kdf, salt, nonce, ciphertext }: VaultFile, key: Uint8Array): VaultSession {
   let plaintext: Uint8Array;
   try {
-    plaintext = c.aesGcmDecrypt(key, nonce, ciphertext, aad(c, kdf, salt));
+    plaintext = c.aesGcmDecrypt(key, nonce, ciphertext, aad(c, kdf, salt, format));
   } catch {
     throw new WrongPasswordError('Senha incorreta ou arquivo adulterado');
   }
   const data = JSON.parse(c.utf8Decode(plaintext));
-  return { key, salt, kdf, entries: data.entries ?? [] };
+  const entries = (data.entries ?? []).map((e: Entry) => ({ ...e, details: e.details ?? '' }));
+  return { key, salt, kdf, entries };
 }
 
-/** Cifra a sessão e devolve o texto do arquivo .gdsn. Nonce novo a cada chamada. */
+/** Cifra a sessão e devolve o texto do arquivo .ncf. Nonce novo a cada chamada. */
 export function sealVault(c: CryptoProvider, s: VaultSession): string {
   const entries = s.entries.map((e) => ({
-    service: e.service, username: e.username, password: e.password,
+    service: e.service, username: e.username, password: e.password, details: e.details ?? '',
     id: e.id, created: e.created, updated: e.updated,
   }));
   const nonce = c.randomBytes(12);
@@ -167,8 +200,8 @@ async function deriveKey(c: CryptoProvider, password: string, salt: Uint8Array, 
  * AAD = json.dumps({...}, sort_keys=True) do Python, byte a byte
  * (chaves ordenadas, separadores ", " e ": ").
  */
-function aad(c: CryptoProvider, kdf: KdfParams, salt: Uint8Array): Uint8Array {
-  return c.utf8Encode(pyJson({ format: FORMAT, version: VERSION, kdf, salt: toBase64(salt) }));
+function aad(c: CryptoProvider, kdf: KdfParams, salt: Uint8Array, format = FORMAT): Uint8Array {
+  return c.utf8Encode(pyJson({ format, version: VERSION, kdf, salt: toBase64(salt) }));
 }
 
 function pyJson(value: unknown): string {
@@ -193,13 +226,13 @@ function toHex(bytes: Uint8Array): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-function toBase64(bytes: Uint8Array): string {
+export function toBase64(bytes: Uint8Array): string {
   let bin = '';
   for (const b of bytes) bin += String.fromCharCode(b);
   return btoa(bin);
 }
 
-function fromBase64(text: string): Uint8Array {
+export function fromBase64(text: string): Uint8Array {
   if (typeof text !== 'string') throw new Error('campo base64 ausente');
   const bin = atob(text);
   const out = new Uint8Array(bin.length);

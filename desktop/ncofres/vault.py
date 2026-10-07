@@ -1,6 +1,6 @@
-"""Formato do cofre GDSN e criptografia.
+"""Formato do cofre NCofres e criptografia.
 
-Arquivo .gdsn = JSON com um cabeçalho em claro (parâmetros do KDF, salt, nonce)
+Arquivo .ncf = JSON com um cabeçalho em claro (parâmetros do KDF, salt, nonce)
 e o conteúdo cifrado com AES-256-GCM. A chave vem da senha mestra via Argon2id.
 O cabeçalho entra como AAD: qualquer alteração nele faz a abertura falhar.
 """
@@ -16,14 +16,15 @@ import string
 import tempfile
 import time
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
 
-FORMAT = "GDSN"
+FORMAT = "NCOFRES"
+LEGACY_FORMATS = ("GDSN",)  # cofres antigos (.gdsn) continuam abrindo
 VERSION = 1
 
 # Parâmetros padrão (~0,5 s num desktop atual). Ficam gravados no arquivo,
@@ -70,6 +71,7 @@ class Entry:
     service: str
     username: str
     password: str
+    details: str = ""  # descrição opcional; cofres antigos não têm
     id: str = field(default_factory=lambda: uuid.uuid4().hex)
     created: float = field(default_factory=time.time)
     updated: float = field(default_factory=time.time)
@@ -125,8 +127,9 @@ class Vault:
     def open(cls, path: Path, master_password: str) -> "Vault":
         try:
             doc = json.loads(Path(path).read_text("utf-8"))
-            if doc.get("format") != FORMAT:
-                raise VaultError("Não é um arquivo GDSN")
+            file_format = doc.get("format")
+            if file_format != FORMAT and file_format not in LEGACY_FORMATS:
+                raise VaultError("Não é um cofre NCofres")
             if doc.get("version") != VERSION:
                 raise VaultError(f"Versão de cofre não suportada: {doc.get('version')}")
             kdf = doc["kdf"]
@@ -138,12 +141,14 @@ class Vault:
 
         key = derive_key(master_password, salt, kdf)
         try:
-            plaintext = AESGCM(key).decrypt(nonce, ciphertext, _aad(kdf, salt))
+            plaintext = AESGCM(key).decrypt(nonce, ciphertext, _aad(kdf, salt, file_format))
         except InvalidTag:
             raise WrongPasswordError("Senha incorreta ou arquivo adulterado") from None
 
         data = json.loads(plaintext)
-        entries = [Entry(**e) for e in data.get("entries", [])]
+        # Ignora campos desconhecidos (vindos de uma versão mais nova do app) em vez de falhar.
+        known = {f.name for f in fields(Entry)}
+        entries = [Entry(**{k: v for k, v in e.items() if k in known}) for e in data.get("entries", [])]
         return cls(path, key, salt, kdf, entries)
 
     # ---- salvar ----------------------------------------------------------
@@ -182,9 +187,9 @@ class Vault:
         self.entries.append(entry)
         self.save()
 
-    def update(self, entry_id: str, **fields) -> None:
+    def update(self, entry_id: str, **changes) -> None:
         entry = self._get(entry_id)
-        for name, value in fields.items():
+        for name, value in changes.items():
             setattr(entry, name, value)
         entry.updated = time.time()
         self.save()
@@ -205,8 +210,8 @@ class Vault:
         self.entries = []
 
 
-def _aad(kdf: dict, salt: bytes) -> bytes:
-    return json.dumps({"format": FORMAT, "version": VERSION, "kdf": kdf, "salt": _b64e(salt)},
+def _aad(kdf: dict, salt: bytes, file_format: str | None = None) -> bytes:
+    return json.dumps({"format": file_format or FORMAT, "version": VERSION, "kdf": kdf, "salt": _b64e(salt)},
                       sort_keys=True).encode("utf-8")
 
 

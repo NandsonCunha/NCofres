@@ -4,8 +4,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from gdsn import vault as v
-from gdsn.vault import Entry, Vault, VaultError, WrongPasswordError, parse_line
+from ncofres import vault as v
+from ncofres.vault import Entry, Vault, VaultError, WrongPasswordError, parse_line
 
 # KDF leve só para os testes rodarem rápido.
 FAST_KDF = {"name": "argon2id", "iterations": 1, "memory_kib": 1024, "lanes": 1}
@@ -14,7 +14,7 @@ FAST_KDF = {"name": "argon2id", "iterations": 1, "memory_kib": 1024, "lanes": 1}
 class VaultTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        self.path = Path(self.tmp.name) / "c.gdsn"
+        self.path = Path(self.tmp.name) / "c.ncf"
         patcher = mock.patch.object(v, "DEFAULT_KDF", FAST_KDF)
         patcher.start()
         self.addCleanup(patcher.stop)
@@ -25,6 +25,33 @@ class VaultTest(unittest.TestCase):
         vault.add(Entry("google", "email@gmail.com", "senha:com:dois-pontos"))
         reopened = Vault.open(self.path, "mestra-forte-123")
         self.assertEqual(reopened.entries[0].password, "senha:com:dois-pontos")
+
+    def test_details_and_unknown_fields(self):
+        vault = Vault.create(self.path, "mestra-forte-123")
+        vault.add(Entry("a", "b", "c", "detalhe"))
+        self.assertEqual(Vault.open(self.path, "mestra-forte-123").entries[0].details, "detalhe")
+
+        # Regrava com um campo que só uma versão futura conhece, e sem "details" (cofre antigo).
+        from dataclasses import asdict
+        raw = asdict(vault.entries[0])
+        del raw["details"]
+        raw["campo_futuro"] = "x"
+        with mock.patch.object(v, "asdict", lambda e: raw):
+            vault.save()
+        reopened = Vault.open(self.path, "mestra-forte-123")
+        self.assertEqual(reopened.entries[0].details, "")
+        self.assertEqual(reopened.entries[0].password, "c")
+
+    def test_legacy_gdsn_vault_opens_and_is_upgraded(self):
+        with mock.patch.object(v, "FORMAT", "GDSN"):  # cofre criado pela versão antiga do app
+            vault = Vault.create(self.path, "mestra-forte-123")
+            vault.add(Entry("a", "b", "c"))
+        self.assertEqual(json.loads(self.path.read_text())["format"], "GDSN")
+        reopened = Vault.open(self.path, "mestra-forte-123")
+        self.assertEqual(reopened.entries[0].password, "c")
+        reopened.save()
+        self.assertEqual(json.loads(self.path.read_text())["format"], "NCOFRES")
+        self.assertEqual(Vault.open(self.path, "mestra-forte-123").entries[0].service, "a")
 
     def test_file_has_no_plaintext(self):
         vault = Vault.create(self.path, "mestra-forte-123")
@@ -79,7 +106,7 @@ class VaultTest(unittest.TestCase):
     def test_backup_written(self):
         vault = Vault.create(self.path, "mestra-forte-123")
         vault.add(Entry("a", "b", "c"))
-        self.assertTrue(self.path.with_name("c.gdsn.bak").exists())
+        self.assertTrue(self.path.with_name("c.ncf.bak").exists())
 
 
 class ParseTest(unittest.TestCase):
