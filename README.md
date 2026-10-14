@@ -26,7 +26,16 @@ npx eas-cli@latest build --profile preview --platform android
 
 Abra o link do final do build no celular e instale o APK.
 
-### Atualizações (sem reinstalar)
+### Dois tipos de APK
+
+| Perfil | Comando | Atualização automática |
+|---|---|---|
+| `preview` | `npx eas-cli@latest build --profile preview --platform android` | Sim (EAS Update) — para testes |
+| `release` | `npx eas-cli@latest build --profile release --platform android` | Não — o `expo-updates` nem entra no APK. Use para distribuir (GitHub Releases). |
+
+O perfil `release` usa o gancho `scripts/eas-build-pre-install.js`, que roda no servidor do EAS antes do `npm install` e tira o `expo-updates` do APK. Os dois APKs são o mesmo app (`com.ncofres.app`): instalar um por cima do outro mantém o cofre.
+
+### Atualizações (sem reinstalar, só APKs `preview`)
 
 Mudanças de código (telas, lógica) chegam pelo EAS Update, como no app Meus Gastos:
 
