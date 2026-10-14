@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Updates from 'expo-updates';
 import type { ComponentProps } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
+import { versionText } from '../appVersion';
 import { STRENGTH_LEVELS } from '../strength';
 import { Button, colors, Sheet, styles as ui } from '../ui';
 
@@ -54,14 +54,6 @@ export function SettingsSheet({ biometricSupported, biometricOn, onToggleBiometr
   );
 }
 
-function versionText(): string {
-  const version = Updates.runtimeVersion ?? '—';
-  if (Updates.isEmbeddedLaunch || !Updates.createdAt) return `Versão ${version}`;
-  const when = Updates.createdAt.toLocaleString('pt-BR', {
-    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
-  });
-  return `Versão ${version} · atualizada em ${when}`;
-}
 
 /** Explicação para o cliente, sem termos técnicos. */
 export function AboutSheet({ onClose }: { onClose: () => void }) {

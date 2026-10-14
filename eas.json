@@ -23,6 +23,16 @@
     "production": {
       "autoIncrement": true,
       "channel": "production"
+    },
+    "release": {
+      "distribution": "internal",
+      "autoIncrement": true,
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "NCOFRES_NO_UPDATES": "1"
+      }
     }
   }
 }

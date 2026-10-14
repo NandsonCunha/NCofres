@@ -35,7 +35,8 @@
     "ios": "expo run:ios",
     "test": "node --test test/format.test.mjs test/strength.test.mjs",
     "typecheck": "tsc --noEmit",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "eas-build-pre-install": "node scripts/eas-build-pre-install.js"
   },
   "private": true
 }
