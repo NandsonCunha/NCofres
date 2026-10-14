@@ -9,7 +9,9 @@ import { createVault, openVault, openVaultWithKey, sealVault, WrongPasswordError
 import type { VaultSession } from '../vault/format';
 import { nativeCrypto } from '../vault/nativeCrypto';
 import { pickVaultFile, readVault, vaultExists, writeVault } from '../vault/storage';
+import { markWelcomeSeen, shouldShowWelcome } from '../firstRun';
 import { Button, colors, IconButton, SecureInput, styles as ui } from '../ui';
+import { AboutSheet } from './Settings';
 
 export const MIN_MASTER_LEN = 10;
 
@@ -25,6 +27,18 @@ export function UnlockScreen({ onUnlocked }: { onUnlocked: (s: VaultSession, how
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [bio, setBio] = useState<BiometricState | null>(null);
+
+  const [welcome, setWelcome] = useState(false);
+
+  // Primeira abertura do app: mostra a tela Sobre como boas-vindas.
+  useEffect(() => {
+    shouldShowWelcome().then(setWelcome);
+  }, []);
+
+  const closeWelcome = () => {
+    setWelcome(false);
+    markWelcomeSeen();
+  };
 
   useEffect(() => {
     getBiometricState().then(setBio).catch(() => setBio(null));
@@ -184,6 +198,7 @@ export function UnlockScreen({ onUnlocked }: { onUnlocked: (s: VaultSession, how
           )}
         </View>
       )}
+      {welcome && <AboutSheet welcome onClose={closeWelcome} />}
     </KeyboardAvoidingView>
   );
 }

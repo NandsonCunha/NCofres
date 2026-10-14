@@ -56,9 +56,10 @@ export function SettingsSheet({ biometricSupported, biometricOn, onToggleBiometr
 
 
 /** Explicação para o cliente, sem termos técnicos. */
-export function AboutSheet({ onClose }: { onClose: () => void }) {
+/** `welcome`: primeira abertura do app — mesmo conteúdo, com título de boas-vindas. */
+export function AboutSheet({ onClose, welcome = false }: { onClose: () => void; welcome?: boolean }) {
   return (
-    <Sheet visible title="Sobre o NCofres" onClose={onClose}>
+    <Sheet visible title={welcome ? 'Bem-vindo ao NCofres' : 'Sobre o NCofres'} onClose={onClose}>
       <ScrollView style={{ maxHeight: 460 }} contentContainerStyle={{ gap: 14 }}>
         <Text style={s.p}>
           O NCofres é um cofre para as suas senhas. Tudo o que você guarda aqui fica trancado por uma
@@ -96,7 +97,7 @@ export function AboutSheet({ onClose }: { onClose: () => void }) {
 
         <Text style={s.version}>{versionText()}</Text>
       </ScrollView>
-      <Button title="Fechar" kind="secondary" onPress={onClose} />
+      <Button title={welcome ? 'Começar' : 'Fechar'} kind={welcome ? 'primary' : 'secondary'} onPress={onClose} />
     </Sheet>
   );
 }

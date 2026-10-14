@@ -367,9 +367,11 @@ class ImportDialog(FormDialog):
 class AboutDialog(QDialog):
     """Explicação para o cliente, sem termos técnicos."""
 
-    def __init__(self, parent):
+    def __init__(self, parent, welcome: bool = False):
+        # welcome: primeira abertura do app — mesmo conteúdo, com título de boas-vindas.
         super().__init__(parent)
-        self.setWindowTitle("Sobre o NCofres")
+        title = "Bem-vindo ao NCofres" if welcome else "Sobre o NCofres"
+        self.setWindowTitle(title)
         self.setFixedWidth(500)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(24, 22, 24, 20)
@@ -380,7 +382,7 @@ class AboutDialog(QDialog):
             lbl.setWordWrap(True)
             lay.addWidget(lbl)
 
-        lay.addWidget(label("Sobre o NCofres", "service"))
+        lay.addWidget(label(title, "service"))
         lay.addSpacing(6)
         para("O NCofres é um cofre para as suas senhas. Tudo o que você guarda aqui fica trancado por uma "
              "senha mestra, que só você conhece.", "")
@@ -418,7 +420,7 @@ class AboutDialog(QDialog):
         version = label(f"Versão {__version__}", "muted")
         version.setAlignment(Qt.AlignCenter)
         lay.addWidget(version)
-        close = button("Fechar")
+        close = button("Começar" if welcome else "Fechar", primary=welcome)
         close.clicked.connect(self.accept)
         lay.addWidget(close)
         lay.setSizeConstraint(QVBoxLayout.SetFixedSize)
@@ -1170,4 +1172,10 @@ def main():
     app.setStyleSheet(STYLE)
     win = MainWindow()
     win.show()
+    # Primeira abertura: mostra a tela Sobre como boas-vindas, uma única vez.
+    if not win.settings.value("welcome_seen", False, type=bool):
+        def welcome():
+            AboutDialog(win, welcome=True).exec()
+            win.settings.setValue("welcome_seen", True)
+        QTimer.singleShot(0, welcome)
     sys.exit(app.exec())
